@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Search Episodes</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <h1>TV Shows and Episodes</h1>
+
+  <!-- Dropdown for selecting shows -->
+  <div class="controls">
+    <label for="showDropdown">Select a TV Show:</label>
+    <select id="showDropdown">
+      <option value="">-- Select a Show --</option>
+    </select>
+  </div>
+
+  <!-- Search for episodes -->
+  <div class="controls">
+    <input type="text" id="searchInput" placeholder="Search shows or episodes..." />
+    <button id="searchButton">Search</button>
+    <p id="showCount"></p>
+  </div>
+
+ 
+  <div id="showDetails"></div>
+
+  <script>
+    const showsUrl = 'https://api.tvmaze.com/shows';
+    let allShows = [];
+    let allEpisodes = [];
+
+    fetch(showsUrl)
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        allShows = data.slice(0, 6); 
+        populateDropdown(allShows);
+        displayShows(allShows);
+      })
+      .catch(error => {
+        console.error('Error fetching TV show data:', error);
+        document.getElementById('showDetails').innerHTML = `<p>Error loading shows. Check console.</p>`;
+      });
+
+  
+    function populateDropdown(shows) {
+      const dropdown = document.getElementById('showDropdown');
+      dropdown.innerHTML = '<option value="">-- Select a Show --</option>'; // Clear existing options
+
+      shows.forEach(show => {
+        const option = document.createElement('option');
+        option.value = show.id; 
+        option.textContent = show.name; 
+        dropdown.appendChild(option);
+      });
+    }
+
+   
+    function displayShows(shows) {
+      const showDetails = document.getElementById('showDetails');
+      showDetails.innerHTML = ''; 
+
+      shows.forEach(show => {
+        const showCard = document.createElement('div');
+        showCard.classList.add('show-card');
+
+        const title = document.createElement('h2');
+        title.textContent = show.name;
+
+        const img = document.createElement('img');
+        img.src = show.image?.medium || 'https://via.placeholder.com/250x375?text=No+Image';
+        img.alt = `Image of ${show.name}`;
+        img.style.maxWidth = '200px';
+        img.style.borderRadius = '8px';
+
+        const summary = document.createElement('div');
+        summary.classList.add('card-summary');
+        summary.innerHTML = show.summary || 'No summary available.';
+
+        const episodeList = document.createElement('ul');
+        episodeList.classList.add('episodes');
+
+     
+        fetch(`https://api.tvmaze.com/shows/${show.id}/episodes`)
+          .then(res => res.json())
+          .then(episodes => {
+            allEpisodes = [...allEpisodes, ...episodes]; 
+            episodes.forEach(ep => {
+              const li = document.createElement('li');
+              li.innerHTML = `<strong>S${ep.season}E${ep.number}: ${ep.name}</strong><br>${ep.summary || 'No summary available.'}`;
+              episodeList.appendChild(li);
+            });
+          })
+          .catch(err => {
+            console.error(`Error fetching episodes for ${show.name}:`, err);
+          });
+
+        showCard.appendChild(title);
+        showCard.appendChild(img);
+        showCard.appendChild(summary);
+        showCard.appendChild(episodeList);
+        showDetails.appendChild(showCard);
+      });
+    }
+
+ 
+    document.getElementById('showDropdown').addEventListener('change', (event) => {
+      const showId = event.target.value;
+      if (showId) {
+        const selectedShow = allShows.find(show => show.id == showId);
+        displayShows([selectedShow]); 
+      } else {
+        displayShows(allShows); 
+      }
+    });
+
+
+    document.getElementById('searchButton').addEventListener('click', () => {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+
+
+      const filteredShows = allShows.filter(show =>
+        show.name.toLowerCase().includes(query) ||
+        (show.summary && show.summary.toLowerCase().includes(query))
+      );
+
+      const filteredEpisodes = allEpisodes.filter(ep =>
+        ep.name.toLowerCase().includes(query) ||
+        (ep.summary && ep.summary.toLowerCase().includes(query))
+      );
+
+
+      displaySearchResults(filteredShows, filteredEpisodes);
+    });
+
+
+    function displaySearchResults(shows, episodes) {
+      const showDetails = document.getElementById('showDetails');
+      showDetails.innerHTML = '';
+
+      if (shows.length > 0) {
+        const showSection = document.createElement('div');
+        showSection.innerHTML = '<h2>Matching Shows:</h2>';
+        shows.forEach(show => {
+          const showCard = document.createElement('div');
+          showCard.classList.add('show-card');
+          showCard.innerHTML = `
+            <h3>${show.name}</h3>
+            <img src="${show.image?.medium || 'https://via.placeholder.com/250x375?text=No+Image'}" alt="Image of ${show.name}" style="max-width: 200px; border-radius: 8px;">
+            <div>${show.summary || 'No summary available.'}</div>
+          `;
+          showSection.appendChild(showCard);
+        });
+        showDetails.appendChild(showSection);
+      }
+
+      if (episodes.length > 0) {
+        const episodeSection = document.createElement('div');
+        episodeSection.innerHTML = '<h2>Matching Episodes:</h2>';
+        const ul = document.createElement('ul');
+        ul.classList.add('episodes');
+
+        episodes.forEach(ep => {
+          const li = document.createElement('li');
+          li.innerHTML = `<strong>S${ep.season}E${ep.number}: ${ep.name}</strong><br>${ep.summary || 'No summary available.'}`;
+          ul.appendChild(li);
+        });
+
+        episodeSection.appendChild(ul);
+        showDetails.appendChild(episodeSection);
+      }
+
+      if (shows.length === 0 && episodes.length === 0) {
+        showDetails.innerHTML = '<p>No matching results found.</p>';
+      }
+    }
+  </script>
+
+  <style>
+
+    .show-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px;
+      max-width: 800px;
+      text-align: center;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .show-card img {
+      margin: 10px 0;
+    }
+
+    .card-summary {
+      text-align: justify;
+      margin: 10px 0;
+    }
+
+    .episodes {
+      list-style-type: none;
+      padding: 0;
+      margin: 20px 0;
+    }
+
+    .episodes li {
+      background: #f9f9f9;
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 12px;
+      word-wrap: break-word;
+    }
+  </style>
+</body>
+</html>
